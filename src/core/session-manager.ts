@@ -110,6 +110,66 @@ export class SessionManager extends EventEmitter {
 
       await this.emulatorAdapter.waitForBoot(session.adbPort, input.bootTimeout);
 
+      // Check root status after boot
+      const isRooted = await this.emulatorAdapter.checkRootStatus(session.adbPort);
+
+      if (!isRooted) {
+        // Root check failed - need to stop emulator, delete AVD, recreate everything
+        this.logger.warn('Root check failed post-boot, triggering full AVD recreation', {
+          sessionId,
+          avdName: avdSetupResult.avdName,
+        });
+
+        // Stop the non-rooted emulator
+        if (session.emulatorPid) {
+          await this.emulatorAdapter.stop(session.emulatorPid);
+          session.emulatorPid = null;
+        }
+
+        // Force recreate AVD (delete + create + root)
+        this.updateState(sessionId, SessionState.SETUP_AVD);
+        const recreatedAvd = await this.avdSetupAdapter.forceRecreateAvd();
+        avdSetupInfo = {
+          avdName: recreatedAvd.avdName,
+          wasCreated: recreatedAvd.wasCreated,
+          wasRooted: recreatedAvd.wasRooted,
+          systemImage: recreatedAvd.systemImage,
+        };
+
+        // Restart emulator with newly rooted AVD
+        this.updateState(sessionId, SessionState.START_EMULATOR);
+        session.state = SessionState.START_EMULATOR;
+
+        const newEmulatorResult = await this.emulatorAdapter.start({
+          avdName: recreatedAvd.avdName,
+          port: input.emulatorPort,
+          headless: input.headless,
+          logFile: path.join(workspace.logsDir, 'emulator.log'),
+        });
+        session.emulatorPort = newEmulatorResult.consolePort;
+        session.adbPort = newEmulatorResult.adbPort;
+        session.emulatorPid = newEmulatorResult.pid;
+
+        // Wait for boot again
+        this.updateState(sessionId, SessionState.WAIT_BOOT);
+        session.state = SessionState.WAIT_BOOT;
+
+        await this.emulatorAdapter.waitForBoot(session.adbPort, input.bootTimeout);
+
+        // Verify root status after recreation
+        const isRootedAfterRecreate = await this.emulatorAdapter.checkRootStatus(session.adbPort);
+        if (!isRootedAfterRecreate) {
+          throw new SniaffError(
+            ErrorCode.ROOT_CHECK_FAILED,
+            'Device is not rooted even after AVD recreation. rootAVD may have failed.',
+            { sessionId, avdName: recreatedAvd.avdName }
+          );
+        }
+
+        this.logger.info('Root check passed after AVD recreation', { sessionId });
+        warnings.push('AVD was recreated due to failed root check on first boot');
+      }
+
       // State: READY
       this.updateState(sessionId, SessionState.READY);
       session.state = SessionState.READY;

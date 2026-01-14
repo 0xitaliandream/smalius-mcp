@@ -355,6 +355,95 @@ export class AvdSetupAdapter {
     }
   }
 
+  /**
+   * Delete an existing AVD completely.
+   * Used when root check fails and we need to start fresh.
+   */
+  async deleteAvd(avdName: string): Promise<void> {
+    this.logger.info('Deleting AVD', { avdName });
+
+    // Check if AVD exists first
+    const exists = await this.avdExists(avdName);
+    if (!exists) {
+      this.logger.info('AVD does not exist, nothing to delete', { avdName });
+      return;
+    }
+
+    // Check avdmanager exists
+    if (!existsSync(this.config.avdmanagerPath)) {
+      throw new SniaffError(
+        ErrorCode.AVDMANAGER_NOT_FOUND,
+        `avdmanager not found at: ${this.config.avdmanagerPath}`,
+        { path: this.config.avdmanagerPath }
+      );
+    }
+
+    try {
+      const command = `${this.config.avdmanagerPath} delete avd -n "${avdName}"`;
+      this.logger.info('Running avdmanager delete', { command });
+
+      const { stdout, stderr } = await execPromise(command, {
+        timeout: 60000, // 1 minute
+      });
+
+      this.logger.info('AVD deleted successfully', {
+        avdName,
+        stdout: stdout.slice(0, 500),
+      });
+
+      // Verify AVD was deleted
+      const stillExists = await this.avdExists(avdName);
+      if (stillExists) {
+        throw new SniaffError(
+          ErrorCode.AVD_DELETE_FAILED,
+          'AVD deletion completed but AVD still exists',
+          { avdName, stderr }
+        );
+      }
+    } catch (error) {
+      if (error instanceof SniaffError) throw error;
+
+      const err = error as Error;
+      throw new SniaffError(
+        ErrorCode.AVD_DELETE_FAILED,
+        `Failed to delete AVD: ${err.message}`,
+        { avdName }
+      );
+    }
+  }
+
+  /**
+   * Force recreate AVD: delete existing + create + root.
+   * Used when root check fails post-boot.
+   */
+  async forceRecreateAvd(): Promise<AvdSetupResult> {
+    const avdName = this.config.sniaffAvdName;
+    const systemImage = this.config.sniaffSystemImage;
+
+    this.logger.info('Force recreating SniaffPhone AVD', { avdName, systemImage });
+
+    // Step 1: Delete existing AVD if it exists
+    await this.deleteAvd(avdName);
+
+    // Step 2: Ensure system image is installed
+    await this.ensureSystemImage(systemImage);
+
+    // Step 3: Create the AVD
+    await this.createAvd(avdName, systemImage);
+
+    // Step 4: Root the AVD with rootAVD
+    await this.rootAvd(systemImage);
+
+    this.logger.info('SniaffPhone AVD force recreation completed', { avdName });
+
+    return {
+      avdName,
+      wasCreated: true,
+      wasRooted: true,
+      systemImage,
+    };
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }

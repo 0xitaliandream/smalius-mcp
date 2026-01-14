@@ -261,6 +261,37 @@ export class EmulatorAdapter {
     this.logger.info('Emulator stopped', { pid });
   }
 
+  /**
+   * Check if the emulator has root access (su binary available and working).
+   * Returns true if rooted, false otherwise.
+   */
+  async checkRootStatus(adbPort: number): Promise<boolean> {
+    const deviceId = `emulator-${adbPort - 1}`;
+
+    this.logger.info('Checking root status', { deviceId });
+
+    try {
+      // Try to run 'su -c id' and check if we get uid=0(root)
+      const { stdout } = await execPromise(
+        `${this.config.adbPath} -s ${deviceId} shell "su -c id"`,
+        { timeout: 10000 }
+      );
+
+      const isRooted = stdout.includes('uid=0');
+      this.logger.info('Root status check completed', { deviceId, isRooted, output: stdout.trim() });
+
+      return isRooted;
+    } catch (error) {
+      // If su command fails, we're not rooted
+      const err = error as Error;
+      this.logger.warn('Root check failed - device is not rooted', {
+        deviceId,
+        error: err.message,
+      });
+      return false;
+    }
+  }
+
   private delay(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }

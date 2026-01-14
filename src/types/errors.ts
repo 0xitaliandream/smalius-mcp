@@ -27,6 +27,9 @@ export enum ErrorCode {
   APK_INSTALL_FAILED = 'APK_INSTALL_FAILED',
   SCREENSHOT_FAILED = 'SCREENSHOT_FAILED',
   TIMEOUT = 'TIMEOUT',
+  // Root check errors
+  ROOT_CHECK_FAILED = 'ROOT_CHECK_FAILED',
+  AVD_DELETE_FAILED = 'AVD_DELETE_FAILED',
 }
 
 export class SniaffError extends Error {
