@@ -2,6 +2,8 @@
 
 MCP server for Android emulator session management.
 
+![rootAVD Demo](rootAVD_MacOS.gif)
+
 ## Prerequisites
 
 ### 1. Java Development Kit (OpenJDK 17)
