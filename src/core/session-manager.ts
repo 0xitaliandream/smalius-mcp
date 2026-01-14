@@ -3,9 +3,8 @@ import { EventEmitter } from 'events';
 import { Config } from '../config.js';
 import { WorkspaceManager, Workspace } from './workspace-manager.js';
 import { ProcessSupervisor } from './process-supervisor.js';
-import { MitmAdapter } from '../adapters/mitm-adapter.js';
 import { EmulatorAdapter } from '../adapters/emulator-adapter.js';
-import { AvdSetupAdapter, AvdSetupResult } from '../adapters/avd-setup-adapter.js';
+import { AvdSetupAdapter } from '../adapters/avd-setup-adapter.js';
 import { PortFinder } from '../utils/port-finder.js';
 import { Logger } from '../utils/logger.js';
 import { generateSessionId } from '../utils/id-generator.js';
@@ -25,7 +24,6 @@ export class SessionManager extends EventEmitter {
   private workspaceManager: WorkspaceManager;
   private supervisor: ProcessSupervisor;
   private portFinder: PortFinder;
-  private mitmAdapter: MitmAdapter;
   private emulatorAdapter: EmulatorAdapter;
   private avdSetupAdapter: AvdSetupAdapter;
 
@@ -38,13 +36,6 @@ export class SessionManager extends EventEmitter {
     this.workspaceManager = new WorkspaceManager(this.config, this.logger);
     this.supervisor = new ProcessSupervisor(this.logger);
     this.portFinder = new PortFinder();
-
-    this.mitmAdapter = new MitmAdapter({
-      config: this.config,
-      supervisor: this.supervisor,
-      portFinder: this.portFinder,
-      logger: this.logger,
-    });
 
     this.emulatorAdapter = new EmulatorAdapter({
       config: this.config,
@@ -90,28 +81,14 @@ export class SessionManager extends EventEmitter {
       session = {
         sessionId,
         avdName: avdName,
-        mitmPort: 0,
         emulatorPort: 0,
         adbPort: 0,
         createdAt: new Date().toISOString(),
         state: SessionState.CREATE_WORKSPACE,
         workspacePath: workspace.path,
-        mitmPid: null,
         emulatorPid: null,
       };
       this.sessions.set(sessionId, session);
-
-      // State: START_MITM
-      this.updateState(sessionId, SessionState.START_MITM);
-      session.state = SessionState.START_MITM;
-
-      const mitmResult = await this.mitmAdapter.start({
-        port: input.mitmPort,
-        outputDir: workspace.trafficDir,
-        logFile: path.join(workspace.logsDir, 'mitm.log'),
-      });
-      session.mitmPort = mitmResult.port;
-      session.mitmPid = mitmResult.pid;
 
       // State: START_EMULATOR
       this.updateState(sessionId, SessionState.START_EMULATOR);
@@ -133,22 +110,6 @@ export class SessionManager extends EventEmitter {
 
       await this.emulatorAdapter.waitForBoot(session.adbPort, input.bootTimeout);
 
-      // State: CONFIGURE_PROXY (best-effort)
-      this.updateState(sessionId, SessionState.CONFIGURE_PROXY);
-      session.state = SessionState.CONFIGURE_PROXY;
-
-      let proxyConfigured = false;
-      try {
-        // 10.0.2.2 is the Android emulator's alias for the host's localhost
-        await this.emulatorAdapter.setProxy(session.adbPort, '10.0.2.2', session.mitmPort);
-        proxyConfigured = true;
-      } catch (error) {
-        this.logger.warn('Proxy configuration failed (best-effort)', {
-          error: error instanceof Error ? error.message : String(error),
-        });
-        warnings.push('DEVICE_PROXY_CONFIG_FAILED');
-      }
-
       // State: READY
       this.updateState(sessionId, SessionState.READY);
       session.state = SessionState.READY;
@@ -157,7 +118,6 @@ export class SessionManager extends EventEmitter {
       await this.workspaceManager.updateMeta(sessionId, {
         sessionId: session.sessionId,
         avdName: session.avdName,
-        mitmPort: session.mitmPort,
         emulatorPort: session.emulatorPort,
         adbPort: session.adbPort,
         createdAt: session.createdAt,
@@ -167,18 +127,15 @@ export class SessionManager extends EventEmitter {
 
       this.logger.info('Session started successfully', {
         sessionId,
-        mitmPort: session.mitmPort,
         emulatorPort: session.emulatorPort,
-        proxyConfigured,
+        adbPort: session.adbPort,
       });
 
       const result: SessionStartResult = {
         sessionId,
         workspacePath: session.workspacePath,
-        mitmPort: session.mitmPort,
         emulatorPort: session.emulatorPort,
         adbPort: session.adbPort,
-        proxyConfigured,
         state: SessionState.READY,
         avdSetup: avdSetupInfo,
       };
@@ -232,18 +189,6 @@ export class SessionManager extends EventEmitter {
       }
     }
 
-    // Stop MITM if running
-    if (session.mitmPid) {
-      try {
-        await this.mitmAdapter.stop(session.mitmPid);
-      } catch (error) {
-        this.logger.error('Failed to stop MITM during rollback', {
-          pid: session.mitmPid,
-          error: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-
     // Update meta to ERROR state (keep workspace for debugging)
     try {
       await this.workspaceManager.updateMeta(session.sessionId, {
@@ -272,23 +217,9 @@ export class SessionManager extends EventEmitter {
 
     this.logger.info('Stopping session', { sessionId });
 
-    // Clear proxy first (best-effort)
-    if (session.adbPort) {
-      try {
-        await this.emulatorAdapter.clearProxy(session.adbPort);
-      } catch {
-        // Ignore proxy clear errors
-      }
-    }
-
     // Stop emulator
     if (session.emulatorPid) {
       await this.emulatorAdapter.stop(session.emulatorPid);
-    }
-
-    // Stop MITM
-    if (session.mitmPid) {
-      await this.mitmAdapter.stop(session.mitmPid);
     }
 
     // Cleanup workspace directory

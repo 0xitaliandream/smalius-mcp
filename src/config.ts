@@ -10,14 +10,12 @@ const PROJECT_ROOT = path.resolve(__dirname, '..');
 export interface Config {
   workspacesDir: string;
   logsDir: string;
-  mitmproxyPath: string;
   emulatorPath: string;
   adbPath: string;
   avdmanagerPath: string;
   sdkmanagerPath: string;
   rootAvdPath: string;
   androidSdkRoot: string;
-  defaultMitmPort: number;
   defaultEmulatorPort: number;
   defaultBootTimeout: number;
   bootPollInterval: number;
@@ -39,7 +37,6 @@ export function loadConfig(): Config {
       path.join(os.homedir(), '.sniaff', 'workspaces'),
     logsDir:
       process.env.SNIAFF_LOGS_DIR || path.join(os.homedir(), '.sniaff', 'logs'),
-    mitmproxyPath: process.env.SNIAFF_MITMDUMP_PATH || 'mitmdump',
     emulatorPath: process.env.SNIAFF_EMULATOR_PATH || 'emulator',
     adbPath: process.env.SNIAFF_ADB_PATH || 'adb',
     avdmanagerPath:
@@ -52,7 +49,6 @@ export function loadConfig(): Config {
       process.env.SNIAFF_ROOTAVD_PATH ||
       path.join(PROJECT_ROOT, 'rootAVD-master', 'rootAVD.sh'),
     androidSdkRoot,
-    defaultMitmPort: parseInt(process.env.SNIAFF_MITM_PORT || '8080', 10),
     defaultEmulatorPort: parseInt(process.env.SNIAFF_EMULATOR_PORT || '5554', 10),
     defaultBootTimeout: parseInt(process.env.SNIAFF_BOOT_TIMEOUT || '120000', 10),
     bootPollInterval: parseInt(process.env.SNIAFF_BOOT_POLL_INTERVAL || '2000', 10),

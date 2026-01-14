@@ -1,13 +1,6 @@
 import { z } from 'zod';
 
 export const StartInputSchema = z.object({
-  mitmPort: z
-    .number()
-    .int()
-    .min(1024)
-    .max(65535)
-    .optional()
-    .describe('MITM proxy port (auto-selected if not provided or busy)'),
   emulatorPort: z
     .number()
     .int()

@@ -8,7 +8,6 @@ import { SniaffError, ErrorCode } from '../types/errors.js';
 export interface Workspace {
   path: string;
   appDir: string;
-  trafficDir: string;
   logsDir: string;
 }
 
@@ -27,7 +26,6 @@ export class WorkspaceManager {
     const workspace: Workspace = {
       path: basePath,
       appDir: path.join(basePath, 'app'),
-      trafficDir: path.join(basePath, 'traffic'),
       logsDir: path.join(basePath, 'logs'),
     };
 
@@ -35,14 +33,12 @@ export class WorkspaceManager {
       // Create all directories
       await fs.mkdir(workspace.path, { recursive: true });
       await fs.mkdir(workspace.appDir);
-      await fs.mkdir(workspace.trafficDir);
       await fs.mkdir(workspace.logsDir);
 
       // Create initial meta.json
       const meta: SessionMeta = {
         sessionId,
         avdName: '',
-        mitmPort: 0,
         emulatorPort: 0,
         adbPort: 0,
         createdAt: new Date().toISOString(),
@@ -66,14 +62,13 @@ export class WorkspaceManager {
 
   async updateMeta(sessionId: string, meta: Partial<SessionMeta>): Promise<void> {
     const basePath = path.join(this.config.workspacesDir, sessionId);
-    const metaPath = path.join(basePath, 'meta.json');
 
     try {
       // Read existing meta
       const existing = await this.readMeta(sessionId);
       const updated = { ...existing, ...meta };
       await this.writeMeta(basePath, updated);
-    } catch (error) {
+    } catch {
       // If read fails, just write the new meta
       await this.writeMeta(basePath, meta as SessionMeta);
     }
@@ -103,9 +98,5 @@ export class WorkspaceManager {
 
   getLogsDir(sessionId: string): string {
     return path.join(this.config.workspacesDir, sessionId, 'logs');
-  }
-
-  getTrafficDir(sessionId: string): string {
-    return path.join(this.config.workspacesDir, sessionId, 'traffic');
   }
 }

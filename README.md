@@ -1,6 +1,6 @@
 # sniaff-android-mcp
 
-MCP server for Android emulator sessions with MITM proxy for traffic interception.
+MCP server for Android emulator session management.
 
 ## Prerequisites
 
@@ -39,19 +39,7 @@ export ANDROID_SDK_ROOT=$ANDROID_HOME
 export PATH="$ANDROID_HOME/emulator:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/latest/bin:$PATH"
 ```
 
-### 3. mitmproxy
-
-```bash
-brew install mitmproxy
-```
-
-Verify installation:
-
-```bash
-mitmdump --version
-```
-
-### 4. Node.js (v18+)
+### 3. Node.js (v18+)
 
 ```bash
 brew install node
@@ -77,12 +65,10 @@ Create a `.env` file (optional) or set environment variables:
 # SNIAFF_LOGS_DIR=/path/to/logs
 
 # Executable paths (default: use PATH)
-# SNIAFF_MITMDUMP_PATH=mitmdump
 # SNIAFF_EMULATOR_PATH=emulator
 # SNIAFF_ADB_PATH=adb
 
-# Default ports
-# SNIAFF_MITM_PORT=8080
+# Default port
 # SNIAFF_EMULATOR_PORT=5554
 
 # Timeouts (in milliseconds)
@@ -104,7 +90,7 @@ claude mcp add-json sniaff-android-mcp '{"command":"node","args":["/path/to/snia
 
 | Tool | Description |
 |------|-------------|
-| `sniaff.start` | Start a new Android emulator session with MITM proxy |
+| `sniaff.start` | Start a new Android emulator session |
 | `sniaff.shell` | Execute shell commands on the emulator |
 | `sniaff.tap` | Tap on screen coordinates |
 | `sniaff.swipe` | Swipe on screen (by direction or coordinates) |

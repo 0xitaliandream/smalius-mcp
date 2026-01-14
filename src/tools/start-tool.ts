@@ -6,15 +6,8 @@ import { SniaffError, ErrorCode } from '../types/errors.js';
 export function registerStartTool(server: McpServer, sessionManager: SessionManager): void {
   server.tool(
     'sniaff.start',
-    'Start a new Android emulator session with MITM proxy for traffic interception. Automatically creates and roots the SniaffPhone AVD if it does not exist. Returns session info with ports and workspace path.',
+    'Start a new Android emulator session. Automatically creates and roots the SniaffPhone AVD if it does not exist. Returns session info with ports and workspace path.',
     {
-      mitmPort: z
-        .number()
-        .int()
-        .min(1024)
-        .max(65535)
-        .optional()
-        .describe('MITM proxy port (auto-selected if not provided or busy)'),
       emulatorPort: z
         .number()
         .int()
@@ -37,7 +30,6 @@ export function registerStartTool(server: McpServer, sessionManager: SessionMana
     async (args) => {
       try {
         const result = await sessionManager.startSession({
-          mitmPort: args.mitmPort,
           emulatorPort: args.emulatorPort,
           bootTimeout: args.bootTimeout,
           headless: args.headless,
