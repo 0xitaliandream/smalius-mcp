@@ -6,6 +6,11 @@ import { loadConfig } from './config.js';
 import { Logger } from './utils/logger.js';
 import { SessionManager } from './core/session-manager.js';
 import { registerStartTool } from './tools/start-tool.js';
+import { registerUiDumpTool } from './tools/ui-dump-tool.js';
+import { registerShellTool } from './tools/shell-tool.js';
+import { registerTapTool } from './tools/tap-tool.js';
+import { registerSwipeTool } from './tools/swipe-tool.js';
+import { registerLongPressTool } from './tools/long-press-tool.js';
 
 async function main() {
   // Load configuration
@@ -33,6 +38,11 @@ async function main() {
 
   // Register tools
   registerStartTool(server, sessionManager);
+  registerUiDumpTool(server, sessionManager, config);
+  registerShellTool(server, sessionManager, config);
+  registerTapTool(server, sessionManager, config);
+  registerSwipeTool(server, sessionManager, config);
+  registerLongPressTool(server, sessionManager, config);
 
   // Connect via stdio transport
   const transport = new StdioServerTransport();
