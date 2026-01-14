@@ -11,6 +11,8 @@ import { registerShellTool } from './tools/shell-tool.js';
 import { registerTapTool } from './tools/tap-tool.js';
 import { registerSwipeTool } from './tools/swipe-tool.js';
 import { registerLongPressTool } from './tools/long-press-tool.js';
+import { registerInstallApkTool } from './tools/install-apk-tool.js';
+import { registerScreenshotTool } from './tools/screenshot-tool.js';
 
 async function main() {
   // Load configuration
@@ -43,6 +45,8 @@ async function main() {
   registerTapTool(server, sessionManager, config);
   registerSwipeTool(server, sessionManager, config);
   registerLongPressTool(server, sessionManager, config);
+  registerInstallApkTool(server, sessionManager, config);
+  registerScreenshotTool(server, sessionManager, config);
 
   // Connect via stdio transport
   const transport = new StdioServerTransport();
