@@ -15,6 +15,8 @@ import { registerInstallApkTool } from './tools/install-apk-tool.js';
 import { registerScreenshotTool } from './tools/screenshot-tool.js';
 import { registerSetProxyTool } from './tools/set-proxy-tool.js';
 import { registerRemoveProxyTool } from './tools/remove-proxy-tool.js';
+import { registerInputTextTool } from './tools/input-text-tool.js';
+import { registerKeyEventTool } from './tools/key-event-tool.js';
 
 async function main() {
   // Load configuration
@@ -51,6 +53,8 @@ async function main() {
   registerScreenshotTool(server, sessionManager, config);
   registerSetProxyTool(server, sessionManager, config);
   registerRemoveProxyTool(server, sessionManager, config);
+  registerInputTextTool(server, sessionManager, config);
+  registerKeyEventTool(server, sessionManager, config);
 
   // Connect via stdio transport
   const transport = new StdioServerTransport();
