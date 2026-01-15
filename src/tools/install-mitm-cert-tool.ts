@@ -8,26 +8,16 @@ import { promisify } from 'util';
 
 const execPromise = promisify(exec);
 
-export function registerSetProxyTool(
+export function registerInstallMitmCertTool(
   server: McpServer,
   sessionManager: SessionManager,
   config: Config
 ): void {
   server.tool(
-    'sniaff.set_proxy',
-    'Configure HTTP proxy settings on the Android emulator. Useful for routing traffic through a MITM proxy like mitmproxy. IMPORTANT: After setting the proxy, you MUST call sniaff.install_mitm_cert to install the CA certificate, otherwise HTTPS traffic will not be intercepted.',
+    'sniaff.install_mitm_cert',
+    'Opens mitm.it in the browser to install the mitmproxy CA certificate. The proxy must be configured first with sniaff.set_proxy. IMPORTANT: After calling this tool, you MUST ask the user to install the certificate and wait for their confirmation before proceeding.',
     {
       sessionId: z.string().min(1).describe('The session ID returned by sniaff.start'),
-      host: z
-        .string()
-        .min(1)
-        .describe('Proxy host address (e.g., "10.0.2.2" for host machine from emulator, or "127.0.0.1")'),
-      port: z
-        .number()
-        .int()
-        .min(1)
-        .max(65535)
-        .describe('Proxy port number (e.g., 8080 for mitmproxy, 8082 for Burp)'),
     },
     async (args) => {
       try {
@@ -41,10 +31,9 @@ export function registerSetProxyTool(
 
         const deviceId = `emulator-${session.adbPort - 1}`;
 
-        // Set the global HTTP proxy
-        const command = `${config.adbPath} -s ${deviceId} shell settings put global http_proxy ${args.host}:${args.port}`;
-
-        await execPromise(command, { timeout: 10000 });
+        // Open mitm.it in the default browser
+        const openCommand = `${config.adbPath} -s ${deviceId} shell am start -a android.intent.action.VIEW -d "http://mitm.it"`;
+        await execPromise(openCommand, { timeout: 10000 });
 
         return {
           content: [
@@ -53,11 +42,15 @@ export function registerSetProxyTool(
               text: JSON.stringify(
                 {
                   ok: true,
-                  proxy: {
-                    host: args.host,
-                    port: args.port,
-                  },
-                  message: `Proxy configured: ${args.host}:${args.port}`,
+                  action: 'REQUIRES_USER_ACTION',
+                  message: 'Browser opened to mitm.it. ASK THE USER to install the certificate and confirm when done.',
+                  instructions: [
+                    '1. Tap on "Android" on the mitm.it page',
+                    '2. The certificate file will download',
+                    '3. Open the downloaded file and install the CA certificate',
+                    '4. If prompted, name it "mitmproxy" and select "VPN and apps" for credential use',
+                    '5. Confirm to the assistant when installation is complete',
+                  ],
                 },
                 null,
                 2
@@ -70,7 +63,7 @@ export function registerSetProxyTool(
           error instanceof SniaffError
             ? error
             : new SniaffError(
-                ErrorCode.PROXY_CONFIG_FAILED,
+                ErrorCode.INTERNAL_ERROR,
                 error instanceof Error ? error.message : String(error),
                 { originalError: error instanceof Error ? error.stack : undefined }
               );
