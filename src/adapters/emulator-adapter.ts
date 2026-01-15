@@ -1,4 +1,7 @@
 import { createWriteStream, WriteStream } from 'fs';
+import * as fs from 'fs/promises';
+import * as path from 'path';
+import * as os from 'os';
 import { exec } from 'child_process';
 import { promisify } from 'util';
 import { Config } from '../config.js';
@@ -291,6 +294,159 @@ export class EmulatorAdapter {
         error: err.message,
       });
       return false;
+    }
+  }
+
+  /**
+   * Install a Magisk module on the emulator.
+   * Pushes the zip to /sdcard/Download/ and installs it via magisk --install-module.
+   */
+  async installMagiskModule(adbPort: number, modulePath: string): Promise<void> {
+    const deviceId = `emulator-${adbPort - 1}`;
+    const moduleFileName = modulePath.split('/').pop() || 'module.zip';
+    const remotePath = `/sdcard/Download/${moduleFileName}`;
+
+    this.logger.info('Installing Magisk module', { deviceId, modulePath, remotePath });
+
+    try {
+      // Push the module zip to the device
+      await execPromise(
+        `${this.config.adbPath} -s ${deviceId} push "${modulePath}" "${remotePath}"`,
+        { timeout: 30000 }
+      );
+
+      this.logger.info('Module pushed to device', { deviceId, remotePath });
+
+      // Install the module via Magisk
+      const { stdout, stderr } = await execPromise(
+        `${this.config.adbPath} -s ${deviceId} shell "su -c 'magisk --install-module ${remotePath}'"`,
+        { timeout: 60000 }
+      );
+
+      this.logger.info('Magisk module installed', {
+        deviceId,
+        moduleFileName,
+        stdout: stdout.trim(),
+        stderr: stderr.trim(),
+      });
+    } catch (error) {
+      const err = error as Error;
+      throw new SniaffError(
+        ErrorCode.INTERNAL_ERROR,
+        `Failed to install Magisk module: ${err.message}`,
+        { deviceId, modulePath }
+      );
+    }
+  }
+
+  /**
+   * Install the mitmproxy CA certificate as a system certificate.
+   * This requires the AlwaysTrustUserCerts Magisk module to be active.
+   * The certificate is read from ~/.mitmproxy/mitmproxy-ca-cert.pem
+   */
+  async installMitmCertificate(adbPort: number): Promise<void> {
+    const deviceId = `emulator-${adbPort - 1}`;
+    const mitmproxyDir = path.join(os.homedir(), '.mitmproxy');
+    const certPath = path.join(mitmproxyDir, 'mitmproxy-ca-cert.pem');
+
+    this.logger.info('Installing mitmproxy CA certificate', { deviceId, certPath });
+
+    try {
+      // Check if mitmproxy certificate exists
+      try {
+        await fs.access(certPath);
+      } catch {
+        throw new SniaffError(
+          ErrorCode.INTERNAL_ERROR,
+          `mitmproxy certificate not found at ${certPath}. Run mitmproxy once to generate it.`,
+          { certPath }
+        );
+      }
+
+      // Get the hash for the certificate filename (Android requires hash.0 format)
+      const { stdout: hashOutput } = await execPromise(
+        `openssl x509 -inform PEM -subject_hash_old -in "${certPath}" | head -1`,
+        { timeout: 10000 }
+      );
+      const certHash = hashOutput.trim();
+      const certFileName = `${certHash}.0`;
+
+      this.logger.info('Certificate hash calculated', { deviceId, certHash, certFileName });
+
+      // Create a temp file with the correct name
+      const tempDir = path.join(os.tmpdir(), 'sniaff-certs');
+      await fs.mkdir(tempDir, { recursive: true });
+      const tempCertPath = path.join(tempDir, certFileName);
+      await fs.copyFile(certPath, tempCertPath);
+
+      // Push certificate to device
+      await execPromise(
+        `${this.config.adbPath} -s ${deviceId} push "${tempCertPath}" /data/local/tmp/${certFileName}`,
+        { timeout: 30000 }
+      );
+
+      // Move to cacerts-added directory (AlwaysTrustUserCerts module will mount it to system)
+      // First ensure the directory exists
+      await execPromise(
+        `${this.config.adbPath} -s ${deviceId} shell "su -c 'mkdir -p /data/misc/user/0/cacerts-added'"`,
+        { timeout: 10000 }
+      );
+
+      // Move and set permissions
+      await execPromise(
+        `${this.config.adbPath} -s ${deviceId} shell "su -c 'mv /data/local/tmp/${certFileName} /data/misc/user/0/cacerts-added/${certFileName}'"`,
+        { timeout: 10000 }
+      );
+
+      await execPromise(
+        `${this.config.adbPath} -s ${deviceId} shell "su -c 'chmod 644 /data/misc/user/0/cacerts-added/${certFileName}'"`,
+        { timeout: 10000 }
+      );
+
+      // Cleanup temp file
+      await fs.unlink(tempCertPath).catch(() => {});
+
+      this.logger.info('mitmproxy CA certificate installed', { deviceId, certFileName });
+    } catch (error) {
+      if (error instanceof SniaffError) throw error;
+      const err = error as Error;
+      throw new SniaffError(
+        ErrorCode.INTERNAL_ERROR,
+        `Failed to install mitmproxy certificate: ${err.message}`,
+        { deviceId }
+      );
+    }
+  }
+
+  /**
+   * Reboot the emulator and wait for it to come back online.
+   */
+  async reboot(adbPort: number, bootTimeout: number): Promise<void> {
+    const deviceId = `emulator-${adbPort - 1}`;
+
+    this.logger.info('Rebooting emulator', { deviceId });
+
+    try {
+      // Send reboot command
+      await execPromise(
+        `${this.config.adbPath} -s ${deviceId} reboot`,
+        { timeout: 10000 }
+      );
+
+      // Wait a bit for the device to start rebooting
+      await this.delay(5000);
+
+      // Wait for boot to complete
+      await this.waitForBoot(adbPort, bootTimeout);
+
+      this.logger.info('Emulator rebooted successfully', { deviceId });
+    } catch (error) {
+      const err = error as Error;
+      throw new SniaffError(
+        ErrorCode.INTERNAL_ERROR,
+        `Failed to reboot emulator: ${err.message}`,
+        { deviceId }
+      );
     }
   }
 

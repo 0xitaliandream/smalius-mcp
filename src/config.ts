@@ -15,6 +15,7 @@ export interface Config {
   avdmanagerPath: string;
   sdkmanagerPath: string;
   rootAvdPath: string;
+  alwaysTrustUserCertsModulePath: string;
   androidSdkRoot: string;
   defaultEmulatorPort: number;
   defaultBootTimeout: number;
@@ -48,6 +49,9 @@ export function loadConfig(): Config {
     rootAvdPath:
       process.env.SNIAFF_ROOTAVD_PATH ||
       path.join(PROJECT_ROOT, 'rootAVD-master', 'rootAVD.sh'),
+    alwaysTrustUserCertsModulePath:
+      process.env.SNIAFF_ALWAYS_TRUST_USER_CERTS_PATH ||
+      path.join(PROJECT_ROOT, 'rootAVD-master', 'Apps', 'AlwaysTrustUserCerts.zip'),
     androidSdkRoot,
     defaultEmulatorPort: parseInt(process.env.SNIAFF_EMULATOR_PORT || '5554', 10),
     defaultBootTimeout: parseInt(process.env.SNIAFF_BOOT_TIMEOUT || '120000', 10),

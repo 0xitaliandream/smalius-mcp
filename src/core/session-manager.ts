@@ -161,6 +161,41 @@ export class SessionManager extends EventEmitter {
 
       await this.emulatorAdapter.waitForBoot(session.adbPort, input.bootTimeout);
 
+      // Install AlwaysTrustUserCerts Magisk module for MITM proxy support
+      try {
+        await this.emulatorAdapter.installMagiskModule(
+          session.adbPort,
+          this.config.alwaysTrustUserCertsModulePath
+        );
+        this.logger.info('AlwaysTrustUserCerts module installed, rebooting...', { sessionId });
+
+        // Reboot to activate the module
+        await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
+        this.logger.info('Reboot after module installation completed', { sessionId });
+
+        // Install mitmproxy CA certificate as system certificate
+        try {
+          await this.emulatorAdapter.installMitmCertificate(session.adbPort);
+          this.logger.info('mitmproxy CA certificate installed, rebooting to activate...', { sessionId });
+
+          // Reboot again so the Magisk module mounts the certificate to system
+          await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
+          this.logger.info('Reboot after certificate installation completed', { sessionId });
+        } catch (certError) {
+          this.logger.warn('Failed to install mitmproxy certificate', {
+            sessionId,
+            error: certError instanceof Error ? certError.message : String(certError),
+          });
+          warnings.push('Failed to install mitmproxy CA certificate. Run mitmproxy once to generate it.');
+        }
+      } catch (error) {
+        this.logger.warn('Failed to install AlwaysTrustUserCerts module', {
+          sessionId,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        warnings.push('Failed to install AlwaysTrustUserCerts Magisk module. MITM certificate trust may not work.');
+      }
+
       // Check root status after boot
       const isRooted = await this.emulatorAdapter.checkRootStatus(session.adbPort);
 
@@ -212,6 +247,41 @@ export class SessionManager extends EventEmitter {
         session.state = SessionState.WAIT_BOOT;
 
         await this.emulatorAdapter.waitForBoot(session.adbPort, input.bootTimeout);
+
+        // Install AlwaysTrustUserCerts Magisk module after recreation
+        try {
+          await this.emulatorAdapter.installMagiskModule(
+            session.adbPort,
+            this.config.alwaysTrustUserCertsModulePath
+          );
+          this.logger.info('AlwaysTrustUserCerts module installed after AVD recreation, rebooting...', { sessionId });
+
+          // Reboot to activate the module
+          await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
+          this.logger.info('Reboot after module installation completed', { sessionId });
+
+          // Install mitmproxy CA certificate as system certificate
+          try {
+            await this.emulatorAdapter.installMitmCertificate(session.adbPort);
+            this.logger.info('mitmproxy CA certificate installed after recreation, rebooting to activate...', { sessionId });
+
+            // Reboot again so the Magisk module mounts the certificate to system
+            await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
+            this.logger.info('Reboot after certificate installation completed', { sessionId });
+          } catch (certError) {
+            this.logger.warn('Failed to install mitmproxy certificate after recreation', {
+              sessionId,
+              error: certError instanceof Error ? certError.message : String(certError),
+            });
+            warnings.push('Failed to install mitmproxy CA certificate. Run mitmproxy once to generate it.');
+          }
+        } catch (error) {
+          this.logger.warn('Failed to install AlwaysTrustUserCerts module after recreation', {
+            sessionId,
+            error: error instanceof Error ? error.message : String(error),
+          });
+          warnings.push('Failed to install AlwaysTrustUserCerts Magisk module. MITM certificate trust may not work.');
+        }
 
         // Verify root status after recreation
         const isRootedAfterRecreate = await this.emulatorAdapter.checkRootStatus(session.adbPort);

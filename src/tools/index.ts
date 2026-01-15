@@ -9,4 +9,3 @@ export * from './set-proxy-tool.js';
 export * from './remove-proxy-tool.js';
 export * from './input-text-tool.js';
 export * from './key-event-tool.js';
-export * from './install-mitm-cert-tool.js';

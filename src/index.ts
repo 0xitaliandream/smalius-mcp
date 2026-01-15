@@ -16,7 +16,6 @@ import { registerSetProxyTool } from './tools/set-proxy-tool.js';
 import { registerRemoveProxyTool } from './tools/remove-proxy-tool.js';
 import { registerInputTextTool } from './tools/input-text-tool.js';
 import { registerKeyEventTool } from './tools/key-event-tool.js';
-import { registerInstallMitmCertTool } from './tools/install-mitm-cert-tool.js';
 
 async function main() {
   // Load configuration
@@ -54,7 +53,6 @@ async function main() {
   registerRemoveProxyTool(server, sessionManager, config);
   registerInputTextTool(server, sessionManager, config);
   registerKeyEventTool(server, sessionManager, config);
-  registerInstallMitmCertTool(server, sessionManager, config);
 
   // Connect via stdio transport
   const transport = new StdioServerTransport();
