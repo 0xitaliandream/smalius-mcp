@@ -123,8 +123,11 @@ export class SessionManager extends EventEmitter {
       this.updateState(sessionId, SessionState.CREATE_WORKSPACE);
       workspace = await this.workspaceManager.create(sessionId);
 
-      // Register session log file
-      await this.logger.registerSessionLog(sessionId, workspace.logsDir);
+      // Register session log file (use shared session android dir if using shared session)
+      const logsDir = useSharedSession
+        ? this.stateClient.getAndroidDir(sessionId)
+        : workspace.logsDir;
+      await this.logger.registerSessionLog(sessionId, logsDir);
 
       session = {
         sessionId,
@@ -146,7 +149,7 @@ export class SessionManager extends EventEmitter {
         avdName: avdName,
         port: input.emulatorPort,
         headless: input.headless,
-        logFile: path.join(workspace.logsDir, 'emulator.log'),
+        logFile: path.join(logsDir, 'emulator.log'),
       });
       session.emulatorPort = emulatorResult.consolePort;
       session.adbPort = emulatorResult.adbPort;
@@ -198,7 +201,7 @@ export class SessionManager extends EventEmitter {
           avdName: recreatedAvd.avdName,
           port: input.emulatorPort,
           headless: input.headless,
-          logFile: path.join(workspace.logsDir, 'emulator.log'),
+          logFile: path.join(logsDir, 'emulator.log'),
         });
         session.emulatorPort = newEmulatorResult.consolePort;
         session.adbPort = newEmulatorResult.adbPort;
