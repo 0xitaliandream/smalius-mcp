@@ -123,6 +123,9 @@ export class SessionManager extends EventEmitter {
       this.updateState(sessionId, SessionState.CREATE_WORKSPACE);
       workspace = await this.workspaceManager.create(sessionId);
 
+      // Register session log file
+      await this.logger.registerSessionLog(sessionId, workspace.logsDir);
+
       session = {
         sessionId,
         avdName: avdName,
@@ -320,6 +323,9 @@ export class SessionManager extends EventEmitter {
       // Ignore meta update errors during rollback
     }
 
+    // Unregister session log
+    this.logger.unregisterSessionLog(session.sessionId);
+
     this.sessions.delete(session.sessionId);
   }
 
@@ -346,6 +352,9 @@ export class SessionManager extends EventEmitter {
 
     // Cleanup workspace directory
     await this.workspaceManager.cleanup(sessionId);
+
+    // Unregister session log
+    this.logger.unregisterSessionLog(sessionId);
 
     this.sessions.delete(sessionId);
     this.logger.info('Session stopped', { sessionId });

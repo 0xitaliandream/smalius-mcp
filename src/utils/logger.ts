@@ -9,23 +9,35 @@ export interface LoggerOptions {
 type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 export class Logger {
-  private logFile: string;
   private name: string;
-  private initialized: boolean = false;
+  private sessionLogFiles: Map<string, string> = new Map();
 
   constructor(options: LoggerOptions) {
     this.name = options.name;
-    this.logFile = path.join(options.logDir, `${options.name}.log`);
-    this.ensureLogDir(options.logDir);
   }
 
   private async ensureLogDir(dir: string): Promise<void> {
     try {
       await fs.mkdir(dir, { recursive: true });
-      this.initialized = true;
     } catch {
       // Best effort - continue even if we can't create log dir
     }
+  }
+
+  /**
+   * Register a session-specific log file. Logs with matching sessionId will be written there.
+   */
+  async registerSessionLog(sessionId: string, logsDir: string): Promise<void> {
+    await this.ensureLogDir(logsDir);
+    const sessionLogFile = path.join(logsDir, 'session.log');
+    this.sessionLogFiles.set(sessionId, sessionLogFile);
+  }
+
+  /**
+   * Unregister a session log file (call when session ends).
+   */
+  unregisterSessionLog(sessionId: string): void {
+    this.sessionLogFiles.delete(sessionId);
   }
 
   private formatMessage(level: LogLevel, message: string, data?: object): string {
@@ -40,11 +52,17 @@ export class Logger {
     // Write to stderr (MCP requirement - stdout is for JSON-RPC only)
     process.stderr.write(formatted);
 
-    // Append to log file (best effort)
-    try {
-      await fs.appendFile(this.logFile, formatted);
-    } catch {
-      // Ignore file write errors
+    // If data contains sessionId, write to session-specific log
+    if (data && 'sessionId' in data) {
+      const sessionId = data.sessionId as string;
+      const sessionLogFile = this.sessionLogFiles.get(sessionId);
+      if (sessionLogFile) {
+        try {
+          await fs.appendFile(sessionLogFile, formatted);
+        } catch {
+          // Ignore session log write errors
+        }
+      }
     }
   }
 
