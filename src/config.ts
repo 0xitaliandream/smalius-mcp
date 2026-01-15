@@ -16,6 +16,7 @@ export interface Config {
   sdkmanagerPath: string;
   rootAvdPath: string;
   alwaysTrustUserCertsModulePath: string;
+  magiskFridaModulePath: string;
   androidSdkRoot: string;
   defaultEmulatorPort: number;
   defaultBootTimeout: number;
@@ -52,6 +53,9 @@ export function loadConfig(): Config {
     alwaysTrustUserCertsModulePath:
       process.env.SNIAFF_ALWAYS_TRUST_USER_CERTS_PATH ||
       path.join(PROJECT_ROOT, 'rootAVD-master', 'Apps', 'AlwaysTrustUserCerts.zip'),
+    magiskFridaModulePath:
+      process.env.SNIAFF_MAGISK_FRIDA_PATH ||
+      path.join(PROJECT_ROOT, 'rootAVD-master', 'Apps', 'MagiskFrida-17.5.2-1.zip'),
     androidSdkRoot,
     defaultEmulatorPort: parseInt(process.env.SNIAFF_EMULATOR_PORT || '5554', 10),
     defaultBootTimeout: parseInt(process.env.SNIAFF_BOOT_TIMEOUT || '120000', 10),

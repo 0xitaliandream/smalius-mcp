@@ -161,26 +161,26 @@ export class SessionManager extends EventEmitter {
 
       await this.emulatorAdapter.waitForBoot(session.adbPort, input.bootTimeout);
 
-      // Install AlwaysTrustUserCerts Magisk module for MITM proxy support
+      // Install Magisk modules and mitmproxy certificate
       try {
+        // Install AlwaysTrustUserCerts module for MITM proxy support
         await this.emulatorAdapter.installMagiskModule(
           session.adbPort,
           this.config.alwaysTrustUserCertsModulePath
         );
-        this.logger.info('AlwaysTrustUserCerts module installed, rebooting...', { sessionId });
+        this.logger.info('AlwaysTrustUserCerts module installed', { sessionId });
 
-        // Reboot to activate the module
-        await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
-        this.logger.info('Reboot after module installation completed', { sessionId });
+        // Install MagiskFrida module for Frida server
+        await this.emulatorAdapter.installMagiskModule(
+          session.adbPort,
+          this.config.magiskFridaModulePath
+        );
+        this.logger.info('MagiskFrida module installed', { sessionId });
 
         // Install mitmproxy CA certificate as system certificate
         try {
           await this.emulatorAdapter.installMitmCertificate(session.adbPort);
-          this.logger.info('mitmproxy CA certificate installed, rebooting to activate...', { sessionId });
-
-          // Reboot again so the Magisk module mounts the certificate to system
-          await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
-          this.logger.info('Reboot after certificate installation completed', { sessionId });
+          this.logger.info('mitmproxy CA certificate installed', { sessionId });
         } catch (certError) {
           this.logger.warn('Failed to install mitmproxy certificate', {
             sessionId,
@@ -188,12 +188,17 @@ export class SessionManager extends EventEmitter {
           });
           warnings.push('Failed to install mitmproxy CA certificate. Run mitmproxy once to generate it.');
         }
+
+        // Single reboot to activate all modules and certificate
+        this.logger.info('Rebooting to activate modules and certificate...', { sessionId });
+        await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
+        this.logger.info('Reboot after modules installation completed', { sessionId });
       } catch (error) {
-        this.logger.warn('Failed to install AlwaysTrustUserCerts module', {
+        this.logger.warn('Failed to install Magisk modules', {
           sessionId,
           error: error instanceof Error ? error.message : String(error),
         });
-        warnings.push('Failed to install AlwaysTrustUserCerts Magisk module. MITM certificate trust may not work.');
+        warnings.push('Failed to install Magisk modules. MITM certificate trust and Frida may not work.');
       }
 
       // Check root status after boot
@@ -248,26 +253,26 @@ export class SessionManager extends EventEmitter {
 
         await this.emulatorAdapter.waitForBoot(session.adbPort, input.bootTimeout);
 
-        // Install AlwaysTrustUserCerts Magisk module after recreation
+        // Install Magisk modules and mitmproxy certificate after recreation
         try {
+          // Install AlwaysTrustUserCerts module for MITM proxy support
           await this.emulatorAdapter.installMagiskModule(
             session.adbPort,
             this.config.alwaysTrustUserCertsModulePath
           );
-          this.logger.info('AlwaysTrustUserCerts module installed after AVD recreation, rebooting...', { sessionId });
+          this.logger.info('AlwaysTrustUserCerts module installed after AVD recreation', { sessionId });
 
-          // Reboot to activate the module
-          await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
-          this.logger.info('Reboot after module installation completed', { sessionId });
+          // Install MagiskFrida module for Frida server
+          await this.emulatorAdapter.installMagiskModule(
+            session.adbPort,
+            this.config.magiskFridaModulePath
+          );
+          this.logger.info('MagiskFrida module installed after AVD recreation', { sessionId });
 
           // Install mitmproxy CA certificate as system certificate
           try {
             await this.emulatorAdapter.installMitmCertificate(session.adbPort);
-            this.logger.info('mitmproxy CA certificate installed after recreation, rebooting to activate...', { sessionId });
-
-            // Reboot again so the Magisk module mounts the certificate to system
-            await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
-            this.logger.info('Reboot after certificate installation completed', { sessionId });
+            this.logger.info('mitmproxy CA certificate installed after recreation', { sessionId });
           } catch (certError) {
             this.logger.warn('Failed to install mitmproxy certificate after recreation', {
               sessionId,
@@ -275,12 +280,17 @@ export class SessionManager extends EventEmitter {
             });
             warnings.push('Failed to install mitmproxy CA certificate. Run mitmproxy once to generate it.');
           }
+
+          // Single reboot to activate all modules and certificate
+          this.logger.info('Rebooting to activate modules and certificate...', { sessionId });
+          await this.emulatorAdapter.reboot(session.adbPort, input.bootTimeout);
+          this.logger.info('Reboot after modules installation completed', { sessionId });
         } catch (error) {
-          this.logger.warn('Failed to install AlwaysTrustUserCerts module after recreation', {
+          this.logger.warn('Failed to install Magisk modules after recreation', {
             sessionId,
             error: error instanceof Error ? error.message : String(error),
           });
-          warnings.push('Failed to install AlwaysTrustUserCerts Magisk module. MITM certificate trust may not work.');
+          warnings.push('Failed to install Magisk modules. MITM certificate trust and Frida may not work.');
         }
 
         // Verify root status after recreation
